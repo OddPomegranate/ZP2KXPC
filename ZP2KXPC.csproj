@@ -1,0 +1,253 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <TieredCompilation>false</TieredCompilation>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Icon.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="Icon.ico" />
+    <None Remove="Icon.bmp" />
+  </ItemGroup>
+	<ItemGroup>
+		<!-- Stop MonoGame from discovering copied MGCB files in the build output -->
+		<MonoGameContentReference Remove="bin\**" />
+		<MonoGameContentReference Remove="obj\**" />
+
+		<!-- Prevent the raw MGCB instruction file from being copied to the output folder -->
+		<None Remove="Content\Content.mgcb" />
+	</ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icon.ico">
+      <LogicalName>Icon.ico</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Icon.bmp">
+      <LogicalName>Icon.bmp</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" />
+    <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*" />
+  </ItemGroup>
+
+  <!--
+    Facepunch.Steamworks - the P2P/lobby backend for ZP2K9.net/SteamNetworkSession.cs
+    (internet multiplayer via Steam's relay network, "Online Multiplayer" in the main
+    menu). Two things to know before this builds clean:
+
+    1. Requires Steam to be installed and running (logged in) on this machine at
+       runtime - there's no way around that, it's how the Steamworks SDK works.
+
+    2. VERSION MISMATCH WARNING: nuget.org's Facepunch.Steamworks package has been
+       stuck at 2.3.3 (2020) for years - the project's real GitHub releases are far
+       newer (2.5.2 as of this writing), but were never published to nuget.org (see
+       https://github.com/Facepunch/Facepunch.Steamworks/issues/834). 2.3.3 is
+       referenced below since it's the only version `dotnet restore` can fetch
+       automatically, and netstandard2.0 packages like this one are consumable from
+       net9.0 with no extra config. SteamNetworkSession.cs was written against the
+       current (2.5.2-era) API surface, gathered from the library's real GitHub
+       source. Most of what it uses (SocketManager/ConnectionManager, the
+       LobbyQuery fluent filter API) has existed in Facepunch.Steamworks for a long
+       time and should be present in 2.3.3 too - but IF THE FIRST BUILD FAILS with
+       "does not contain a definition for..." errors pointing at Steamworks types
+       (SocketManager, ConnectionManager, CreateRelaySocket, ConnectRelay,
+       InitRelayNetworkAccess, or the Lobby/LobbyQuery members), that's this version
+       gap surfacing - the fix is to remove the PackageReference below and instead
+       add a plain <Reference Include="Facepunch.Steamworks"><HintPath>...</HintPath>
+       pointing at the newer Facepunch.Steamworks.dll downloaded directly from
+       https://github.com/Facepunch/Facepunch.Steamworks/releases (along with the
+       matching steam_api64.dll/steam_api64.so next to the .exe at runtime - the
+       NuGet package's own copy of that native library uses an older "content"
+       convention that isn't guaranteed to auto-copy under this SDK-style project
+       either, so it may need a manual <None Include>/CopyToOutputDirectory entry
+       the same way Content/data/map/chars already get one further down this file).
+
+    3. Prototyping is against Valve's public test AppID 480 ("Spacewar") - see
+       SteamInit.AppId in SteamNetworkSession.cs - so no Steamworks App ID purchase
+       is needed until this is ready to actually ship on Steam.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Facepunch.Steamworks" Version="2.3.3" />
+  </ItemGroup>
+
+  <!--
+    steam_api64.dll - the native Steamworks SDK library that Facepunch.Steamworks
+    P/Invokes into at runtime (see the long comment above). This is exactly the
+    gap that comment's item 2 warned about: the NuGet package's own copy of this
+    native library uses an older "content" convention that doesn't reliably
+    auto-copy under this SDK-style project, so without an explicit item here it
+    never lands next to the built/published .exe and has to be copied in by hand
+    after every build/publish. CopyToOutputDirectory items like this one are
+    included in `dotnet publish` output too (same as the Content/data/map/chars
+    entries above), so this is the one place that needs to know about it.
+  -->
+  <ItemGroup>
+    <None Include="steam_api64.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!--
+    Wires Content.mgcb into the build so MonoGame.Content.Builder.Task actually
+    invokes MGCB and builds the entries below into real Windows .xnb files at
+    output time. Without this item the .mgcb file is inert (which is why it was
+    previously just an empty stub with no effect).
+  -->
+  <ItemGroup>
+    <MonoGameContentReference Include="Content\Content.mgcb" />
+  </ItemGroup>
+
+  <!--
+    Content, data, map, and chars hold the game's original pre-built assets
+    (already-compiled .xnb/XACT files, .zkx maps, char defs, texture meta) —
+    not raw source for the MGCB content pipeline to build. They're loaded at
+    runtime via relative paths (ContentManager and direct File.Open calls),
+    so they just need to land next to the .exe on every build, kept in sync
+    with the source copies. This mirrors Visual Studio's "Copy to Output
+    Directory: Copy if newer" file property.
+  -->
+  <!--
+    The Content\gfx texture .xnb files are the original Xbox 360 content-pipeline
+    output (custom SurfaceFormat numbering, big-endian DXT color endpoints) and are
+    NOT loadable by MonoGame at runtime. They were decoded to PNG siblings (see
+    Claude Temp Here/xnb_tool) and are now rebuilt into proper Windows .xnb files by
+    the MGCB entries added to Content.mgcb, which the MonoGame.Content.Builder.Task
+    package builds automatically and places at the same output path. So the raw
+    broken .xnb files must NOT be copied to the output directory, or they'd overwrite
+    (or be overwritten by, depending on build order) the good MGCB-built ones.
+  -->
+  <ItemGroup>
+    <None Remove="Content\gfx\**\*.xnb" />
+  </ItemGroup>
+
+  <!--
+    Arial.xnb / Impact.xnb / Segoe.xnb are the original Xbox 360 SpriteFont content
+    (a glyph atlas using yet another custom, undecoded surface format). Only "Segoe"
+    is actually loaded by the game (Game1.cs: Content.Load<SpriteFont>("Segoe")), and
+    rather than reverse-engineer another Xbox-360-only binary format, these are now
+    rebuilt from *.spritefont descriptions referencing the equivalent real Windows
+    system fonts (Arial, Impact, Segoe UI) via MGCB's FontDescriptionProcessor. The
+    raw broken .xnb must not be copied over the freshly-built ones.
+  -->
+  <ItemGroup>
+    <None Remove="Content\Arial.xnb" />
+    <None Remove="Content\Impact.xnb" />
+    <None Remove="Content\Segoe.xnb" />
+  </ItemGroup>
+
+  <!--
+    fx/blur.xnb, fx/main.xnb, fx/mainlite.xnb, fx/scene.xnb are the only Effect
+    files actually loaded at runtime (Content.Load<Effect> in Game1.cs / MainMenu.cs).
+    They're Xbox 360 GPU shader bytecode, which has no portable path to PC/OpenGL —
+    there is no HLSL source in this repo to recompile. They've been rewritten from
+    scratch (Content/fx/*.fx) as reasonable approximations inferred from how the game
+    sets each effect's parameters (tint/gradient/blur/saturation), and MGCB now builds
+    those instead. bloom.xnb, filter.xnb, and filter.bak.xnb are never loaded by any
+    code path, so they're left as-is (unused, harmless).
+  -->
+  <ItemGroup>
+    <None Remove="Content\fx\blur.xnb" />
+    <None Remove="Content\fx\main.xnb" />
+    <None Remove="Content\fx\mainlite.xnb" />
+    <None Remove="Content\fx\scene.xnb" />
+  </ItemGroup>
+
+  <!--
+    IMPORTANT: unlike the gfx .xnb files above, the Content/sfx/*.wav files
+    must NOT be excluded from the normal CopyToOutputDirectory flow, even
+    though they're only MGCB build input and not something the game loads
+    directly. MonoGame.Content.Builder.Task invokes mgcb with /workingDir
+    pointing at the COPIED bin/Debug/<tfm>/Content/ tree, not the source
+    Content/ folder - so mgcb can only find sfx/trackNN_name.wav as build
+    input if the normal content-copy step already put it there. Excluding
+    them (as an earlier pass here mistakenly did) makes mgcb fail with
+    "The source file '.../bin/Debug/net9.0/Content/sfx/trackNN....wav' does
+    not exist!" for every audio entry. So the 480MB of raw wav (and the gfx
+    PNGs, same story) still has to sit next to the built .xnb in the normal
+    build output folder - but as of the storage-optimization ItemGroup
+    further down this file, CopyToPublishDirectory=Never keeps both out of
+    what actually gets published to players.
+
+    sfxproj.xgs/snd.xsb/wav.xwb are the original Xbox 360 XACT3 project files
+    this whole Content/sfx pipeline was reverse-engineered from. Nothing in
+    the codebase references them any more (Sound.cs/Music.cs were rewritten
+    off AudioEngine/WaveBank/SoundBank entirely) and Content.mgcb doesn't
+    build them either, so - unlike the .wav files - excluding these three
+    from the output copy is safe and just trims ~37MB of dead weight. They
+    stay in place in the source tree as a reference/backup.
+  -->
+  <ItemGroup>
+    <None Remove="Content\sfx\sfxproj.xgs" />
+    <None Remove="Content\sfx\snd.xsb" />
+    <None Remove="Content\sfx\wav.xwb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Content\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="data\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="map\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="chars\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!--
+    Storage optimization (2026-08-24): Content\sfx\*.wav (~480MB) and
+    Content\gfx\**\*.png (~28MB) are pure MGCB build INPUT, per the big
+    comment above about why CopyToOutputDirectory has to stay PreserveNewest
+    for them (mgcb's /workingDir is the copied bin\<config>\<tfm>\Content\
+    folder, not the source Content\ folder, so every local build still needs
+    its own copy there). But nothing in the game ever loads a .wav or .png
+    directly - Sound.cs/Music.cs load SoundEffect/Song objects by asset name
+    through ContentManager, which only ever resolves to the compiled .xnb -
+    so none of this needs to reach players. CopyToPublishDirectory=Never
+    keeps both out of `dotnet publish` output specifically (while leaving
+    CopyToOutputDirectory alone, so normal builds/F5 are unaffected), which
+    cuts roughly 500MB off every published copy of the game. Must come after
+    the Content\**\*.* block above - this only adds metadata on top of the
+    items it already declared, it doesn't need to repeat CopyToOutputDirectory.
+  -->
+  <ItemGroup>
+    <None Update="Content\sfx\*.wav">
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </None>
+    <None Update="Content\gfx\**\*.png">
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Content\fx\scene.fx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <!--
+    originalFiles/ holds a full reference dump of the pre-Xbox ZP2KX_3.0 source
+    tree (multiple old sub-projects: ZP2K9, Backup, xCharEdit, zpCharEdit,
+    SceneEdit, yMapEdit, xSceneEdit) that the clean source PNGs under Content/gfx
+    were pulled from (2026-08-23) to replace the DXT5-compression-artifact/noise
+    versions. It's full of its own .cs/.resx/.csproj files (multiple copies of
+    Game1.cs, HUD.cs, Program.cs, AssemblyInfo.cs, etc.) which, left alone, the
+    SDK-style project's implicit **/*.cs / **/*.resx globs would happily sweep
+    into THIS project's build, causing mass duplicate-type/duplicate-assembly-
+    attribute errors (same class of bug as the round-5 "_to_delete inside
+    ZP2KXPC" lesson). Excluded from every implicit item type so it's inert.
+  -->
+  <ItemGroup>
+    <Compile Remove="originalFiles\**\*.cs" />
+    <EmbeddedResource Remove="originalFiles\**\*.resx" />
+    <None Remove="originalFiles\**\*.*" />
+    <Content Remove="originalFiles\**\*.*" />
+  </ItemGroup>
+</Project>
