@@ -6,9 +6,8 @@ As this is not listed on Steam it uses the public Space Wars test servers.
 
 ZP2KX was made completely by Ska Studios, this is a port I made with AI assistance from Claude. Due to the end of Xbox Live Indie Games I have gotten permission from Ska Studios to share this recompilation. It will be taken down upon their request, or whenever an official PC port comes around.
 
-## How To Set Up Steam Multiplayer
-
- Requirements
+ ## Requirements
+ 
 - Windows 10/11 (64-bit)
 - [.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0): If the game won't launch with a ".NET runtime not found" error, this is almost always why.
 - [Steam](https://store.steampowered.com/about/): Must be installed and running (signed in) but it's only needed for online multiplayer. Practice mode and Lan work without it.
