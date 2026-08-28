@@ -6,7 +6,7 @@ As this is not listed on Steam it uses the public Space Wars test servers.
 
 ZP2KX was made completely by Ska Studios, this is a port I made with AI assistance from Claude. Due to the end of Xbox Live Indie Games I have gotten permission from Ska Studios to share this recompilation. It will be taken down upon their request, or whenever an official PC port comes around.
 
-##H ow To Set Up Steam Multiplayer
+## How To Set Up Steam Multiplayer
 
  Requirements
 - Windows 10/11 (64-bit)
