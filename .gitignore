@@ -30,3 +30,8 @@ Thumbs.db
 # two lines - nothing else depends on them being excluded.
 originalFiles/
 Claude Temp Here/
+
+# Publish profile contains a machine-specific output path - not something to
+# share/commit. Copy Properties/PublishProfiles/FolderProfile.pubxml.example
+# to FolderProfile.pubxml and set your own PublishDir.
+Properties/PublishProfiles/FolderProfile.pubxml
